@@ -37,6 +37,10 @@ type AppResourceModel struct {
 	GitRepoSlug      types.String `tfsdk:"git_repo_slug"`
 	GitOwner         types.String `tfsdk:"git_owner"`
 	Title            types.String `tfsdk:"title"`
+	ProjectType      types.String `tfsdk:"project_type"`
+	StackID          types.String `tfsdk:"stack_id"`
+	Config           types.String `tfsdk:"config"`
+	Mode             types.String `tfsdk:"mode"`
 }
 
 func (r *AppResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -60,8 +64,9 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Default:             booldefault.StaticBool(false),
 			},
 			"organization_slug": schema.StringAttribute{
-				Required:            true,
+				Optional:            true,
 				MarkdownDescription: "SLUG for the organization",
+				Default:             stringdefault.StaticString("cf38e3d194d03fa2"),
 			},
 			"repo_url": schema.StringAttribute{
 				Required:            true,
@@ -69,7 +74,7 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 			},
 			"type": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "SLUG for the organization",
+				MarkdownDescription: "Type of the repository",
 				Default:             stringdefault.StaticString("git"),
 			},
 			"git_repo_slug": schema.StringAttribute{
@@ -77,12 +82,30 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				MarkdownDescription: "Name of the git repository",
 			},
 			"git_owner": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "Not sure",
+				Optional:            true,
+				MarkdownDescription: "Github org name",
+				Default:             stringdefault.StaticString("pgdevelopers"),
 			},
 			"title": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Optional app rename",
+			},
+			"project_type": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Operating system",
+			},
+			"stack_id": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Not sure?",
+			},
+			"config": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "OS configuration?",
+			},
+			"Mode": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Must be manual",
+				Default:             stringdefault.StaticString("manual"),
 			},
 		},
 	}

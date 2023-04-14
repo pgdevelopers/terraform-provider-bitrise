@@ -24,7 +24,7 @@ type BitriseProvider struct {
 
 // BitriseProviderModel describes the provider data model.
 type BitriseProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+	Token types.String `tfsdk:"token"`
 }
 
 func (p *BitriseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -35,9 +35,9 @@ func (p *BitriseProvider) Metadata(ctx context.Context, req provider.MetadataReq
 func (p *BitriseProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
-				Optional:            true,
+			"token": schema.StringAttribute{
+				MarkdownDescription: "PAT for Authorization header",
+				Required:            true,
 			},
 		},
 	}
