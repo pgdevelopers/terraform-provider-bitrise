@@ -28,7 +28,7 @@ type BitriseProviderModel struct {
 }
 
 func (p *BitriseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "Bitrise"
+	resp.TypeName = "bitrise"
 	resp.Version = p.version
 }
 

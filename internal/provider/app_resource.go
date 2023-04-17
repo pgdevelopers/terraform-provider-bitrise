@@ -1,9 +1,13 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -27,9 +31,42 @@ type AppResource struct {
 	client *http.Client
 }
 
+// Response from calling register endpoint
+type RegisterResponse struct {
+	Status  string `json:"status"`
+	AppSlug string `json:"slug"`
+}
+
+type FinishResponse struct {
+	Status            string `json:"status"`
+	BuildTriggerToken string `json:"build_trigger_token"`
+	BranchName        string `json:"branch_name"`
+	Webhook           bool   `json:"is_webhook_auto_reg_supported"`
+	WorkflowID        string `json:"default_workflow_id"`
+}
+
+type Register struct {
+	RepoProvider     string `json:"provider"`
+	IsPublic         bool   `json:"is_public"`
+	OrganizationSlug string `json:"organization_slug"`
+	RepoUrl          string `json:"repo_url"`
+	Type             string `json:"type"`
+	GitRepoSlug      string `json:"git_repo_slug"`
+	GitOwner         string `json:"git_owner"`
+	Title            string `json:"title"`
+}
+
+type Finish struct {
+	ProjectType      string `json:"project_type"`
+	StackID          string `json:"stack_id"`
+	Config           string `json:"config"`
+	Mode             string `json:"mode"`
+	OrganizationSlug string `json:"organization_slug"`
+}
+
 // AppResourceModel describes the resource data model.
 type AppResourceModel struct {
-	Provider         types.String `tfsdk:"provider"`
+	RepoProvider     types.String `tfsdk:"repo_provider"`
 	IsPublic         types.Bool   `tfsdk:"is_public"`
 	OrganizationSlug types.String `tfsdk:"organization_slug"`
 	RepoUrl          types.String `tfsdk:"repo_url"`
@@ -53,18 +90,21 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 		MarkdownDescription: "App resource",
 
 		Attributes: map[string]schema.Attribute{
-			"provider": schema.StringAttribute{
-				MarkdownDescription: "Repo provider",
+			"repo_provider": schema.StringAttribute{
 				Optional:            true,
+				MarkdownDescription: "Repo provider",
+				Computed:            true,
 				Default:             stringdefault.StaticString("github"),
 			},
 			"is_public": schema.BoolAttribute{
 				MarkdownDescription: "Is the app public or private",
 				Optional:            true,
+				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
 			"organization_slug": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "SLUG for the organization",
 				Default:             stringdefault.StaticString("cf38e3d194d03fa2"),
 			},
@@ -74,6 +114,7 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 			},
 			"type": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Type of the repository",
 				Default:             stringdefault.StaticString("git"),
 			},
@@ -83,6 +124,7 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 			},
 			"git_owner": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Github org name",
 				Default:             stringdefault.StaticString("pgdevelopers"),
 			},
@@ -102,8 +144,9 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Required:            true,
 				MarkdownDescription: "OS configuration?",
 			},
-			"Mode": schema.StringAttribute{
+			"mode": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Must be manual",
 				Default:             stringdefault.StaticString("manual"),
 			},
@@ -141,20 +184,14 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create App, got error: %s", err))
-	//     return
-	// }
+	//***************************** API CALL *******************************
+	slug, err := register(data)
+	if err != nil {
+		return
+	}
+	_, err = finish(data, slug)
+	//*****************************
 
-	// For the purposes of this App code, hardcoding a response value to
-	// save into the Terraform state.
-	// data.Id = types.StringValue("App-id")
-
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, "created a resource")
 
 	// Save data into Terraform state
@@ -226,4 +263,81 @@ func (r *AppResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 func (r *AppResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func register(a *AppResourceModel) (string, error) {
+	respStruct := RegisterResponse{}
+	register := Register{
+		RepoProvider:     a.RepoProvider.ValueString(),
+		IsPublic:         a.IsPublic.ValueBool(),
+		OrganizationSlug: a.OrganizationSlug.ValueString(),
+		RepoUrl:          a.RepoUrl.ValueString(),
+		Type:             a.Type.ValueString(),
+		GitRepoSlug:      a.GitRepoSlug.ValueString(),
+		GitOwner:         a.GitOwner.ValueString(),
+		Title:            a.Title.ValueString(),
+	}
+	//resp.Diagnostics.AddError("Look here!", fmt.Sprintf("This is something: %s", register.OrganizationSlug))
+	marshalled, err := json.Marshal(register)
+	if err != nil {
+		return "error", err
+	}
+	request, err := http.NewRequest("POST", "https://api.bitrise.io/v0.1/apps/register", bytes.NewReader(marshalled))
+	if err != nil {
+		return "error", err
+	}
+	request.Header.Set("Authorization", "EZgewzA9KET4uj4cFqoadeLiHwBMKV4orgmZ7kd3AGy_yiMKGBPt050u7KT7fFRd7otH3KGuDKBeftVj0pCxkw")
+	request.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(request)
+	if err != nil {
+		return "error", err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "error", err
+	}
+	err = json.Unmarshal(body, &respStruct)
+	if err != nil {
+		return "error", err
+	}
+	defer res.Body.Close()
+	return respStruct.AppSlug, nil
+}
+
+func finish(a *AppResourceModel, slug string) (FinishResponse, error) {
+	respStruct := FinishResponse{}
+	finish := Finish{
+		ProjectType:      a.ProjectType.ValueString(),
+		Config:           a.Config.ValueString(),
+		StackID:          a.StackID.ValueString(),
+		OrganizationSlug: a.OrganizationSlug.ValueString(),
+		Mode:             a.Mode.ValueString(),
+	}
+	marshalled, err := json.Marshal(finish)
+	if err != nil {
+		return respStruct, err
+	}
+	url := "https://api.bitrise.io/v0.1/apps/" + slug + "/finish"
+	request, err := http.NewRequest("POST", url, bytes.NewReader(marshalled))
+	if err != nil {
+		return respStruct, err
+	}
+	request.Header.Set("Authorization", "EZgewzA9KET4uj4cFqoadeLiHwBMKV4orgmZ7kd3AGy_yiMKGBPt050u7KT7fFRd7otH3KGuDKBeftVj0pCxkw")
+	request.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(request)
+	if err != nil {
+		return respStruct, err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return respStruct, err
+	}
+	err = json.Unmarshal(body, &respStruct)
+	if err != nil {
+		return respStruct, err
+	}
+	defer res.Body.Close()
+	return respStruct, nil
 }
