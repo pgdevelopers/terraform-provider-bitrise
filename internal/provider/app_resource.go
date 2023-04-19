@@ -66,6 +66,7 @@ type Finish struct {
 
 // AppResourceModel describes the resource data model.
 type AppResourceModel struct {
+	Token            types.String `tfsdk:"token"`
 	RepoProvider     types.String `tfsdk:"repo_provider"`
 	IsPublic         types.Bool   `tfsdk:"is_public"`
 	OrganizationSlug types.String `tfsdk:"organization_slug"`
@@ -90,6 +91,10 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 		MarkdownDescription: "App resource",
 
 		Attributes: map[string]schema.Attribute{
+			"token": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Bitrise access token",
+			},
 			"repo_provider": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Repo provider",
@@ -286,7 +291,7 @@ func register(a *AppResourceModel) (string, error) {
 	if err != nil {
 		return "error", err
 	}
-	request.Header.Set("Authorization", "EZgewzA9KET4uj4cFqoadeLiHwBMKV4orgmZ7kd3AGy_yiMKGBPt050u7KT7fFRd7otH3KGuDKBeftVj0pCxkw")
+	request.Header.Set("Authorization", a.Token.ValueString())
 	request.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 10 * time.Second}
 	res, err := client.Do(request)
@@ -323,7 +328,7 @@ func finish(a *AppResourceModel, slug string) (FinishResponse, error) {
 	if err != nil {
 		return respStruct, err
 	}
-	request.Header.Set("Authorization", "EZgewzA9KET4uj4cFqoadeLiHwBMKV4orgmZ7kd3AGy_yiMKGBPt050u7KT7fFRd7otH3KGuDKBeftVj0pCxkw")
+	request.Header.Set("Authorization", a.Token.ValueString())
 	request.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 10 * time.Second}
 	res, err := client.Do(request)

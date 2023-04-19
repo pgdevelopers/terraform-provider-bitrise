@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure BitriseProvider satisfies various provider interfaces.
@@ -24,7 +23,6 @@ type BitriseProvider struct {
 
 // BitriseProviderModel describes the provider data model.
 type BitriseProviderModel struct {
-	Token types.String `tfsdk:"token"`
 }
 
 func (p *BitriseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -34,12 +32,7 @@ func (p *BitriseProvider) Metadata(ctx context.Context, req provider.MetadataReq
 
 func (p *BitriseProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"token": schema.StringAttribute{
-				MarkdownDescription: "PAT for Authorization header",
-				Required:            true,
-			},
-		},
+		Attributes: map[string]schema.Attribute{},
 	}
 }
 
