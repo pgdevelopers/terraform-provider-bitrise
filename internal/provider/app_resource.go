@@ -66,6 +66,7 @@ type Finish struct {
 
 // AppResourceModel describes the resource data model.
 type AppResourceModel struct {
+	Slug             *string      `tfsdk:"slug"`
 	Token            types.String `tfsdk:"token"`
 	RepoProvider     types.String `tfsdk:"repo_provider"`
 	IsPublic         types.Bool   `tfsdk:"is_public"`
@@ -91,6 +92,12 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 		MarkdownDescription: "App resource",
 
 		Attributes: map[string]schema.Attribute{
+			"slug": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "App slug. Only necessary for delete and update.",
+				Default:             stringdefault.StaticString(""),
+			},
 			"token": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Bitrise access token",
@@ -196,6 +203,7 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	_, err = finish(data, slug)
 	//*****************************
+	data.Slug = &slug
 
 	tflog.Trace(ctx, "created a resource")
 
@@ -257,6 +265,15 @@ func (r *AppResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
+	if *data.Slug == "" {
+		resp.Diagnostics.AddError("Missing app slug", "Please provide app slug for deletion")
+		return
+	}
+
+	err := delete(data, *data.Slug)
+	if err != nil {
+		resp.Diagnostics.AddError("Error", fmt.Sprintf("Error deleting resource: %d", err))
+	}
 	// If applicable, this is a great opportunity to initialize any necessary
 	// provider client data and make a call using it.
 	// httpResp, err := r.client.Do(httpReq)
@@ -345,4 +362,20 @@ func finish(a *AppResourceModel, slug string) (FinishResponse, error) {
 	}
 	defer res.Body.Close()
 	return respStruct, nil
+}
+
+func delete(a *AppResourceModel, slug string) error {
+	url := "https://api.bitrise.io/v0.1/apps/" + slug
+	request, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Authorization", a.Token.ValueString())
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	return nil
 }
